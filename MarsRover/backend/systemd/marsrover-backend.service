@@ -1,0 +1,16 @@
+[Unit]
+Description=MarsRover backend (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+# Set User to the account that owns the repository on the Pi (default 'pi').
+# The %h expansion will expand to the user's home directory.
+User=pi
+WorkingDirectory=%h/MarsRover/backend
+EnvironmentFile=%h/MarsRover/backend/.env
+ExecStart=%h/MarsRover/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
