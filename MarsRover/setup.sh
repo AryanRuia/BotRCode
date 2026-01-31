@@ -13,6 +13,57 @@ else
   SUDO=""
 fi
 
+# CLI flags for streamlined / non-interactive runs
+AUTO_YES=0
+SKIP_HOTSPOT=0
+NONINTERACTIVE=0
+# hotspot defaults via CLI
+HOTSPOT_SSID_ARG=""
+HOTSPOT_PSK_ARG=""
+HOTSPOT_IFACE_ARG=""
+HOTSPOT_IP_ARG=""
+HOTSPOT_DHCP_START_ARG=""
+HOTSPOT_DHCP_END_ARG=""
+HOTSPOT_SHARE_IFACE_ARG=""
+
+while [[ ${#} -gt 0 ]]; do
+  case "$1" in
+    -y|--yes)
+      AUTO_YES=1; shift;;
+    --no-hotspot)
+      SKIP_HOTSPOT=1; shift;;
+    --noninteractive)
+      NONINTERACTIVE=1; shift;;
+    --hotspot-ssid)
+      HOTSPOT_SSID_ARG="$2"; shift 2;;
+    --hotspot-psk)
+      HOTSPOT_PSK_ARG="$2"; shift 2;;
+    --hotspot-iface)
+      HOTSPOT_IFACE_ARG="$2"; shift 2;;
+    --hotspot-ip)
+      HOTSPOT_IP_ARG="$2"; shift 2;;
+    --hotspot-dhcp-start)
+      HOTSPOT_DHCP_START_ARG="$2"; shift 2;;
+    --hotspot-dhcp-end)
+      HOTSPOT_DHCP_END_ARG="$2"; shift 2;;
+    --hotspot-share)
+      HOTSPOT_SHARE_IFACE_ARG="$2"; shift 2;;
+    -h|--help)
+      echo "Usage: $0 [--yes] [--no-hotspot] [--noninteractive] [--hotspot-ssid SSID] [--hotspot-psk PSK] [--hotspot-iface IFACE] [--hotspot-ip IP] [--hotspot-dhcp-start IP] [--hotspot-dhcp-end IP] [--hotspot-share IFACE]"
+      exit 0;;
+    *)
+      echo "Unknown option: $1"; shift;;
+  esac
+done
+
+# If in noninteractive mode, preseed iptables-persistent to avoid prompts
+if [[ "$NONINTERACTIVE" -eq 1 || "$AUTO_YES" -eq 1 ]]; then
+  export DEBIAN_FRONTEND=noninteractive
+  # auto-save IPv4 rules, don't autosave IPv6 by default
+  echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | sudo debconf-set-selections || true
+  echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | sudo debconf-set-selections || true
+fi
+
 # Detect OS and install required packages
 OS="$(uname -s)"
 if [[ "$OS" == "Linux" ]]; then
@@ -76,39 +127,61 @@ backup_file() {
 }
 
 setup_hotspot() {
-  read -rp "Would you like to configure this Pi as a Wi-Fi hotspot? [y/N]: " ans
-  if [[ ! "$ans" =~ ^[Yy] ]]; then
-    echo "Skipping hotspot setup."
+  # Honor CLI flags to allow non-interactive setup
+  if [[ "${SKIP_HOTSPOT:-0}" == "1" ]]; then
+    echo "Skipping hotspot setup due to --no-hotspot flag."
     return
   fi
 
-  # defaults
-  SSID_DEFAULT="MarsRover"
-  read -rp "Enter hotspot SSID [${SSID_DEFAULT}]: " HOT_SSID
-  HOT_SSID="${HOT_SSID:-$SSID_DEFAULT}"
-
-  while true; do
-    read -rsp "Enter hotspot passphrase (min 8 chars): " HOT_PSK
-    echo
-    if [[ -z "$HOT_PSK" ]]; then
-      echo "No passphrase entered; creating open hotspot (not recommended)."
-      break
-    elif [[ ${#HOT_PSK} -ge 8 ]]; then
-      break
-    else
-      echo "Passphrase too short; must be at least 8 characters."
+  if [[ "$AUTO_YES" -eq 1 ]] || [[ -n "${HOTSPOT_SSID_ARG:-}" ]]; then
+    echo "Auto-accepting hotspot setup (defaults may be used or overridden via --hotspot-* args)."
+    SSID_DEFAULT="MarsRover"
+    HOT_SSID="${HOTSPOT_SSID_ARG:-$SSID_DEFAULT}"
+    HOT_PSK="${HOTSPOT_PSK_ARG:-}"
+    HOT_IFACE="${HOTSPOT_IFACE_ARG:-wlan0}"
+    HOT_IP="${HOTSPOT_IP_ARG:-192.168.50.1}"
+    DHCP_START="${HOTSPOT_DHCP_START_ARG:-192.168.50.10}"
+    DHCP_END="${HOTSPOT_DHCP_END_ARG:-192.168.50.100}"
+    SHARE_IFACE="${HOTSPOT_SHARE_IFACE_ARG:-}"
+    if [[ -n "$HOT_PSK" && ${#HOT_PSK} -lt 8 ]]; then
+      echo "Provided hotspot passphrase is too short (min 8 chars). Aborting hotspot setup."
+      return
     fi
-  done
+  else
+    read -rp "Would you like to configure this Pi as a Wi-Fi hotspot? [y/N]: " ans
+    if [[ ! "$ans" =~ ^[Yy] ]]; then
+      echo "Skipping hotspot setup."
+      return
+    fi
 
-  read -rp "Hotspot interface (default wlan0): " HOT_IFACE
-  HOT_IFACE="${HOT_IFACE:-wlan0}"
-  read -rp "Hotspot IP (default 192.168.50.1): " HOT_IP
-  HOT_IP="${HOT_IP:-192.168.50.1}"
-  read -rp "DHCP range start (default 192.168.50.10): " DHCP_START
-  DHCP_START="${DHCP_START:-192.168.50.10}"
-  read -rp "DHCP range end (default 192.168.50.100): " DHCP_END
-  DHCP_END="${DHCP_END:-192.168.50.100}"
-  read -rp "Share internet from interface (leave blank for none, e.g. eth0): " SHARE_IFACE
+    # defaults
+    SSID_DEFAULT="MarsRover"
+    read -rp "Enter hotspot SSID [${SSID_DEFAULT}]: " HOT_SSID
+    HOT_SSID="${HOT_SSID:-$SSID_DEFAULT}"
+
+    while true; do
+      read -rsp "Enter hotspot passphrase (min 8 chars): " HOT_PSK
+      echo
+      if [[ -z "$HOT_PSK" ]]; then
+        echo "No passphrase entered; creating open hotspot (not recommended)."
+        break
+      elif [[ ${#HOT_PSK} -ge 8 ]]; then
+        break
+      else
+        echo "Passphrase too short; must be at least 8 characters."
+      fi
+    done
+
+    read -rp "Hotspot interface (default wlan0): " HOT_IFACE
+    HOT_IFACE="${HOT_IFACE:-wlan0}"
+    read -rp "Hotspot IP (default 192.168.50.1): " HOT_IP
+    HOT_IP="${HOT_IP:-192.168.50.1}"
+    read -rp "DHCP range start (default 192.168.50.10): " DHCP_START
+    DHCP_START="${DHCP_START:-192.168.50.10}"
+    read -rp "DHCP range end (default 192.168.50.100): " DHCP_END
+    DHCP_END="${DHCP_END:-192.168.50.100}"
+    read -rp "Share internet from interface (leave blank for none, e.g. eth0): " SHARE_IFACE
+  fi
 
   echo "Configuring hotspot: SSID=$HOT_SSID IFACE=$HOT_IFACE IP=$HOT_IP"
 
@@ -258,7 +331,23 @@ fi
 python3 -m venv "$BACKEND_DIR/venv"
 source "$BACKEND_DIR/venv/bin/activate"
 python -m pip install --upgrade pip
-pip install -r "$BACKEND_DIR/requirements.txt"
+if ! pip install -r "$BACKEND_DIR/requirements.txt"; then
+  echo "\nERROR: pip failed to install some backend packages."
+  echo "Common fixes: run 'pip index versions <package>' (e.g. adafruit-circuitpython-lsm6ds) to see available versions."
+  echo "Try installing problem packages manually, then re-run: pip install -r backend/requirements.txt"
+  echo "If you're on Raspberry Pi, make sure piwheels is available and up-to-date."
+  exit 1
+fi
+
+# Run camera diagnostics (helpful on Pi with IMX519/Arducam)
+if is_raspberry_pi; then
+  echo "\nRunning camera diagnostic (backend/tools/check_camera.py)..."
+  if python3 "$BACKEND_DIR/tools/check_camera.py"; then
+    echo "Camera diagnostic completed (see output above)."
+  else
+    echo "Camera diagnostic completed with errors (see output above). If your IMX519 requires Arducam drivers, follow instructions in backend/README.md."
+  fi
+fi
 
 # Frontend deps and build
 if command -v npm >/dev/null 2>&1; then
