@@ -19,8 +19,24 @@ if [[ "$OS" == "Linux" ]]; then
   # Basic apt-based install for Raspberry Pi OS / Debian
   echo "Detected Linux. Installing system packages (requires sudo)."
   $SUDO apt-get update
-  $SUDO apt-get install -y python3 python3-venv python3-pip i2c-tools libgpiod2 libatlas3-base libffi-dev build-essential \
-    libcamera-apps hostapd dnsmasq iptables-persistent nodejs npm
+
+  # Prepare package list and detect libgpiod variant to avoid 'Unable to locate package' errors
+  PKGS=(python3 python3-venv python3-pip i2c-tools libatlas3-base libffi-dev build-essential libcamera-apps hostapd dnsmasq iptables-persistent nodejs npm)
+  if apt-cache show libgpiod2 >/dev/null 2>&1; then
+    PKGS+=(libgpiod2)
+  elif apt-cache show libgpiod1 >/dev/null 2>&1; then
+    PKGS+=(libgpiod1)
+  elif apt-cache show libgpiod >/dev/null 2>&1; then
+    PKGS+=(libgpiod)
+  else
+    echo "Warning: no libgpiod package found in repositories; GPIO access may require manual installation (e.g., libgpiod-dev) or a kernel package. Continuing without it."
+  fi
+
+  echo "Installing packages: ${PKGS[*]}"
+  $SUDO apt-get install -y "${PKGS[@]}" || {
+    echo "Some packages failed to install. You can try running 'sudo apt-get update' and retrying, or install missing packages manually."
+  }
+
   echo "Note: For camera support ensure libcamera is installed and camera is enabled in raspi-config if using Raspberry Pi OS."
 else
   echo "Detected non-Linux OS ($OS). Please install Python 3.11+, Node.js, and system deps manually."
