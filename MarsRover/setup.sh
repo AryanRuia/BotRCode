@@ -170,6 +170,11 @@ EOF
 
   # Enable IP forwarding
   echo "Enabling net.ipv4.ip_forward"
+  # Ensure /etc/sysctl.conf exists before using sed
+  if [[ ! -f /etc/sysctl.conf ]]; then
+    echo "/etc/sysctl.conf not found — creating a new one"
+    sudo bash -c "echo '# sysctl settings managed by MarsRover setup' > /etc/sysctl.conf"
+  fi
   sudo sed -i.bak -E "s|#?net.ipv4.ip_forward=.*|net.ipv4.ip_forward=1|" /etc/sysctl.conf || true
   sudo sysctl -w net.ipv4.ip_forward=1 || true
 
@@ -187,7 +192,14 @@ EOF
   sudo systemctl unmask hostapd
   sudo systemctl enable hostapd
   sudo systemctl enable dnsmasq
-  sudo systemctl restart dhcpcd || true
+
+  # Only try to restart dhcpcd if the service exists on this distro
+  if systemctl list-unit-files | grep -q '^dhcpcd.service'; then
+    sudo systemctl restart dhcpcd || true
+  else
+    echo "dhcpcd.service not present on this system; skipping restart"
+  fi
+
   sudo systemctl restart dnsmasq || true
   sudo systemctl restart hostapd || true
 

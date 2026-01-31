@@ -3,7 +3,8 @@ uvicorn[standard]==0.22.0
 python-dotenv==1.0.0
 aiofiles==23.1.0
 pyserial==3.5
-picamera2==0.30
+# Use a picamera2 release available on Pi repositories/pypi (0.3.x series)
+picamera2>=0.3.30,<0.4
 adafruit-circuitpython-lsm6ds==2.3.2
 adafruit-circuitpython-bmp3xx==2.2.6
 pytest==8.4.3
