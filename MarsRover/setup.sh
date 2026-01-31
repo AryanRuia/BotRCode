@@ -332,11 +332,38 @@ python3 -m venv "$BACKEND_DIR/venv"
 source "$BACKEND_DIR/venv/bin/activate"
 python -m pip install --upgrade pip
 if ! pip install -r "$BACKEND_DIR/requirements.txt"; then
-  echo "\nERROR: pip failed to install some backend packages."
-  echo "Common fixes: run 'pip index versions <package>' (e.g. adafruit-circuitpython-lsm6ds) to see available versions."
-  echo "Try installing problem packages manually, then re-run: pip install -r backend/requirements.txt"
-  echo "If you're on Raspberry Pi, make sure piwheels is available and up-to-date."
-  exit 1
+  echo "\nERROR: pip failed to install some backend packages. Attempting automatic fallback for known packages..."
+
+  # List of packages to attempt automatic resolution for (try latest available on index)
+  FALLBACK_PKGS=("adafruit-circuitpython-lsm6ds" "adafruit-circuitpython-bmp3xx")
+  for pkg in "${FALLBACK_PKGS[@]}"; do
+    echo "Checking available versions for $pkg..."
+    # Use 'pip index versions' output to obtain available versions; skip if it fails
+    versions=$(pip index versions "$pkg" 2>/dev/null | sed -n 's/^Available versions: //p' | head -n1 || true)
+    if [[ -n "$versions" ]]; then
+      latest=$(echo "$versions" | awk -F',' '{print $1}' | tr -d '[:space:]')
+      if [[ -n "$latest" ]]; then
+        echo "Trying to install $pkg==$latest"
+        if pip install "$pkg==$latest"; then
+          echo "Installed $pkg==$latest"
+        else
+          echo "Failed to install $pkg==$latest"
+        fi
+      fi
+    else
+      echo "No available versions found via pip index for $pkg; skipping automatic fallback for this package."
+    fi
+  done
+
+  echo "Retrying pip install -r $BACKEND_DIR/requirements.txt ..."
+  if pip install -r "$BACKEND_DIR/requirements.txt"; then
+    echo "pip install succeeded after fallback."
+  else
+    echo "Automatic fallback did not resolve all issues.\nCommon fixes: run 'pip index versions <package>' (e.g. adafruit-circuitpython-bmp3xx) to see available versions." 
+    echo "Try installing problem packages manually, then re-run: pip install -r backend/requirements.txt"
+    echo "If you're on Raspberry Pi, make sure piwheels is available and up-to-date."
+    exit 1
+  fi
 fi
 
 # Run camera diagnostics (helpful on Pi with IMX519/Arducam)

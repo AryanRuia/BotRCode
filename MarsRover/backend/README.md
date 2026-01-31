@@ -22,9 +22,10 @@ Camera diagnostic helper
 
   python backend/tools/check_camera.py
 
-If `pip` fails installing `adafruit-circuitpython-lsm6ds`, try:
-- pip index versions adafruit-circuitpython-lsm6ds
-- pip install 'adafruit-circuitpython-lsm6ds>=4.1.0,<5.0'
+If `pip` fails installing `adafruit-circuitpython-lsm6ds` or `adafruit-circuitpython-bmp3xx`, try:
+- pip index versions <package>  # e.g. pip index versions adafruit-circuitpython-bmp3xx
+- pip install '<packageName>>=<min>,<max'  # e.g. pip install 'adafruit-circuitpython-bmp3xx>=1.3.0,<2.0'
+- Ensure `piwheels` is available and up-to-date on Raspberry Pi (it provides prebuilt wheels for many CircuitPython libraries).
 
 If you prefer, I can add an automatic camera check into `setup.sh` that runs `backend/tools/check_camera.py` and reports results after the installs. Would you like that added?- XBee connected via UART; the script will enable serial (UART) if run on a Raspberry Pi and you should set `SERIAL_PORT` correctly in `.env`.
 
