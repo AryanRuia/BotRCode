@@ -89,7 +89,7 @@ def capture_jpeg():
             ]
             for cmd in candidates:
                 try:
-                    proc = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, text=True, capture_output=True, timeout=10)
+                    proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=10)
                 except subprocess.TimeoutExpired:
                     # command took too long; try next candidate
                     continue
