@@ -14,8 +14,10 @@ import os
 
 def run(cmd):
     try:
-        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True, text=True)
-        return out
+        proc = subprocess.run(cmd, stderr=subprocess.STDOUT, shell=True, text=True, capture_output=True, timeout=8)
+        return proc.stdout
+    except subprocess.TimeoutExpired as e:
+        return f"TIMEOUT after {e.timeout}s\n{getattr(e, 'output', '') or ''}"
     except subprocess.CalledProcessError as e:
         return e.output
 

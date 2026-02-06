@@ -89,10 +89,11 @@ def capture_jpeg():
             ]
             for cmd in candidates:
                 try:
-                    subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True)
-                except subprocess.CalledProcessError:
-                    # ignore and try next candidate
-                    pass
+                    proc = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, text=True, capture_output=True, timeout=10)
+                except subprocess.TimeoutExpired:
+                    # command took too long; try next candidate
+                    continue
+                # if command returned quickly, check whether file was created
                 if os.path.exists(tmpname):
                     with open(tmpname, 'rb') as f:
                         data = f.read()
