@@ -18,9 +18,31 @@ Hardware notes:
 - The `setup.sh` installs `libcamera-apps` and the Python `picamera2` package (0.3.x series) but it cannot automatically install 3rd-party kernel modules—install IMX519 drivers manually if required.
 
 Camera diagnostic helper
-- A small helper is provided at `backend/tools/check_camera.py` that runs quick checks (libcamera presence, /dev/videoX, and a Picamera2 import + capture). Run it with:
+- A small helper is provided at `backend/tools/check_camera.py` that runs quick checks (libcamera presence, `/dev/video*`, Arducam `rpicam-still`, and a Picamera2 import + capture).
 
-  python backend/tools/check_camera.py
+Run it from the project root (activate the venv first if used):
+
+```bash
+source backend/venv/bin/activate
+python backend/tools/check_camera.py
+```
+
+- If the script prints `libcamera-hello not found in PATH` but `rpicam-still --list-cameras` lists your IMX519, you have Arducam drivers installed. You can either use Arducam's tools (rpicam-*) or install Picamera2 to integrate with libcamera/Picamera2 APIs.
+
+Install Picamera2 inside the project venv (recommended):
+
+```bash
+source backend/venv/bin/activate
+pip install 'picamera2>=0.3.30,<0.4'
+```
+
+After installing, re-run the diagnostic; a working camera should show `Picamera2 import OK` and `Capture OK`.
+
+If libcamera tools are missing entirely, install system package:
+
+```bash
+sudo apt install libcamera-apps
+```
 
 If `pip` fails installing `adafruit-circuitpython-lsm6ds` or `adafruit-circuitpython-bmp3xx`, try:
 - pip index versions <package>  # e.g. pip index versions adafruit-circuitpython-bmp3xx

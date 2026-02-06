@@ -335,7 +335,7 @@ if ! pip install -r "$BACKEND_DIR/requirements.txt"; then
   echo "\nERROR: pip failed to install some backend packages. Attempting automatic fallback for known packages..."
 
   # List of packages to attempt automatic resolution for (try latest available on index)
-  FALLBACK_PKGS=("adafruit-circuitpython-lsm6ds" "adafruit-circuitpython-bmp3xx")
+  FALLBACK_PKGS=("adafruit-circuitpython-lsm6ds" "adafruit-circuitpython-bmp3xx" "pytest")
   for pkg in "${FALLBACK_PKGS[@]}"; do
     echo "Checking available versions for $pkg..."
     # Use 'pip index versions' output to obtain available versions; skip if it fails
@@ -368,6 +368,19 @@ fi
 
 # Run camera diagnostics (helpful on Pi with IMX519/Arducam)
 if is_raspberry_pi; then
+  # Ensure picamera2 is present in the venv; attempt an install if missing
+  echo "\nChecking Picamera2 availability in venv..."
+  if ! python -c "import picamera2" >/dev/null 2>&1; then
+    echo "Picamera2 not importable in venv; attempting to install picamera2..."
+    if pip install 'picamera2>=0.3.30,<0.4'; then
+      echo "Installed Picamera2 into venv."
+    else
+      echo "Failed to install Picamera2 automatically. You can install manually (activate venv then run: pip install 'picamera2>=0.3.30,<0.4')."
+    fi
+  else
+    echo "Picamera2 import OK in venv."
+  fi
+
   echo "\nRunning camera diagnostic (backend/tools/check_camera.py)..."
   if python3 "$BACKEND_DIR/tools/check_camera.py"; then
     echo "Camera diagnostic completed (see output above)."
