@@ -9,86 +9,94 @@ Structure
 
 See `backend/README.md` and `frontend/README.md` for usage notes. For hotspot setup details see `HOTSPOT.md`.
 
-## Setup on Raspberry Pi 5 (recommended command order) ✅
+## Quick setup on Raspberry Pi 5
 
-Follow these steps on the Pi **as your normal user** (do NOT run the whole script with sudo; the script will call sudo when needed):
-
-1) Update repo and inspect local changes
+This project includes helper scripts to streamline provisioning. Recommended minimal sequence to update the repo, install build dependencies, and start the services:
 
 ```bash
+# 1) Update the repository
 cd ~/BotRCode/MarsRover
-git status
 git fetch origin
-# If you have local edits you want to keep:
-# git add -A && git commit -m "WIP: save local changes"
-# Or temporarily stash: git stash push -m "wip"
-
 git pull origin main
-```
-Expected output: "Updating <old>..<new>" or "Already up to date." If there are conflicts, git will prompt to resolve them.
 
-2) Make setup script executable
-
-```bash
+# 2) Make scripts executable (run once)
 chmod +x ./setup.sh
-```
-Expected output: no output on success.
+chmod +x backend/scripts/install-build-deps.sh
 
-3) Run consolidated setup (interactive)
+# 3) Install system build deps, create/activate venv, and install Python requirements
+# Use the helper script below to set up the Python venv and build deps (preferred):
+cd backend
+./scripts/install-build-deps.sh
 
-```bash
+# (Optional) If you need the hotspot/system configuration or to run the full provisioning
+# flow, run the consolidated setup script instead:
+cd ..
 ./setup.sh
-```
-Expected output highlights:
-- "== MarsRover setup script =="
-- Apt installs and service enable messages (may prompt for iptables-persistent)
-- "Hotspot configuration complete. Your Pi should be advertising Wi-Fi SSID: <your-SSID>" (if chosen)
-- "Running camera diagnostic..." followed by camera detection output
-- "pip install -r backend/requirements.txt" success messages
 
-If you prefer non-interactive provisioning (headless), run:
+# 4) (Optional) Build frontend and copy into backend/static
+cd ../frontend
+npm ci
+npm run build
+cp -r dist/. ../backend/static/
+
+# 5) Run backend directly for testing
+cd ../backend
+./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 6) (Optional) Enable systemd service
+sudo systemctl daemon-reload
+sudo systemctl enable --now marsrover-backend
+sudo systemctl status marsrover-backend -l
+```
+
+Notes:
+- The `./setup.sh` script performs system package installs (using `sudo`), enables services, creates/activates a `venv` under `backend/`, installs Python requirements, and optionally builds the frontend. Use the script unless you need a custom manual workflow.
+- If a package still fails to build (for example `python-prctl`), see the "Troubleshooting wheel-build failures" section below for the manual apt/pip commands.
+- If you want to discard local edits and force the repo to match `origin/main`, run:
 
 ```bash
-./setup.sh --yes --noninteractive --hotspot-ssid MarsSensor --hotspot-psk hunter2
+git fetch origin
+git reset --hard origin/main
+git clean -fd
 ```
-This will pre-seed iptables and accept defaults.
 
-4) Activate the Python venv and verify packages
+Troubleshooting wheel-build failures on Raspberry Pi
+-----------------------------------------------
+
+Some Python packages (for example `python-prctl`) require system C headers and libraries to build wheels. If you see errors like:
+
+```
+You need to install libcap development headers to build this module
+ERROR: Failed to build 'python-prctl' when getting requirements to build wheel
+```
+
+Run these commands on the Pi to install common build dependencies and retry:
 
 ```bash
-source backend/venv/bin/activate
-pip -V
-pip list | grep -E "picamera2|adafruit|pytest"
-```
-Expected output: pip pointing to `backend/venv` and the listed packages present. Example: `pip X.Y.Z from /home/pi/MarsRover/backend/venv/lib/pythonX.X/site-packages (python X.X)`
+sudo apt update
+sudo apt install -y libcap-dev build-essential python3-dev pkg-config
 
-Troubleshooting common pip errors
-- If you see a permission error (OSError: Permission denied) when installing into the venv, it usually means the venv was created as root. Fix by:
+# activate project venv (if used)
+cd ~/BotRCode/MarsRover/backend
+source venv/bin/activate
+
+# upgrade packaging tools and reinstall
+pip install --upgrade pip setuptools wheel
+pip install python-prctl
+# or reinstall all requirements
+pip install -r requirements.txt
+```
+
+Alternative: install the OS package (if available) to avoid building from source:
 
 ```bash
-# (recommended) change ownership back to your user
-sudo chown -R "$(id -u):$(id -g)" backend/venv
-# re-activate and retry
-source backend/venv/bin/activate
-pip install -r backend/requirements.txt
+sudo apt install -y python3-prctl
+pip install -r requirements.txt
 ```
-Expected output: no permission errors and packages installed.
 
-- If pip reports a missing / incompatible package version (e.g. pytest==8.4.3 not found), try installing a flexible compatible version:
+If installation still fails, run `pip install python-prctl -v` and paste the output here for further diagnosis.
 
-```bash
-pip install 'pytest>=8.4.0,<9.0'
-pip install -r backend/requirements.txt
-```
-Expected output: pytest wheel installed (e.g. `Successfully installed pytest-8.4.2`) and the final requirements command completes.
-
-- To inspect available versions:
-
-```bash
-pip index versions <package>
-# Example
-pip index versions adafruit-circuitpython-bmp3xx
-```
+<!-- The separate helper script was removed in favor of using the single `./setup.sh` entrypoint. -->
 
 5) Camera check (IMX519 / Arducam)
 
