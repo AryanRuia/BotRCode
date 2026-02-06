@@ -9,6 +9,7 @@ This script checks for libcamera and Picamera2 availability and attempts a basic
 import subprocess
 import sys
 import shutil
+import os
 
 
 def run(cmd):
@@ -67,11 +68,25 @@ def main():
         print('Picamera2 import failed:', e)
         print('\nIf you see cameras via `rpicam-still --list-cameras` (Arducam) you can try a quick capture with Arducam tools:')
         if shutil.which('rpicam-still'):
-            print('Attempting a quick capture with rpicam-still to /tmp/marsrover-test.jpg (1920x1080)...')
-            out = run('rpicam-still --camera 0 --output /tmp/marsrover-test.jpg --mode 1920x1080 || true')
-            print(out)
-            if os.path.exists('/tmp/marsrover-test.jpg'):
-                print('Arducam capture succeeded: /tmp/marsrover-test.jpg')
+            print('Attempting a quick capture with rpicam-still to /tmp/marsrover-test.jpg (try safe modes)...')
+            candidates = [
+                'rpicam-still --camera 0 --output /tmp/marsrover-test.jpg',
+                'rpicam-still --camera 0 --output /tmp/marsrover-test.jpg --width 1920 --height 1080',
+                'rpicam-still --camera 0 --output /tmp/marsrover-test.jpg --mode 1920x1080',
+            ]
+            out = ''
+            for cmd in candidates:
+                out = run(cmd + ' || true')
+                print('Tried:', cmd)
+                print(out)
+                if os.path.exists('/tmp/marsrover-test.jpg'):
+                    print('Arducam capture succeeded: /tmp/marsrover-test.jpg')
+                    try:
+                        os.remove('/tmp/marsrover-test.jpg')
+                    except Exception:
+                        pass
+                    break
+                # continue to next candidate
             else:
                 print('Arducam capture did not produce a file; check rpicam-still options and drivers.')
         else:

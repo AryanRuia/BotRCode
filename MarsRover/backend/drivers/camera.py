@@ -1,50 +1,107 @@
-"""Camera wrapper using Picamera2; returns JPEG bytes or None on failure"""
+"""Camera wrapper: try Picamera2 first, then Arducam `rpicam-still` fallback.
 
-try:
-    from picamera2 import Picamera2
-    from libcamera import Transform
-    hw = True
-except Exception:
-    hw = False
+Returns JPEG bytes on success or `None` on failure.
+"""
+
+import os
+import shutil
+import subprocess
+import tempfile
 
 _camera = None
 
 
 def _ensure_camera():
+    """Return an initialized Picamera2 instance or None if unavailable."""
     global _camera
-    if not hw:
+    if _camera is not None:
+        return _camera
+
+    try:
+        # import locally so missing libcamera doesn't break module import
+        from picamera2 import Picamera2
+    except Exception:
         return None
-    if _camera is None:
+
+    try:
         pc2 = Picamera2()
-        camera_config = pc2.create_still_configuration(main={'format':'RGB888'})
-        pc2.configure(camera_config)
+        # prefer still configuration but fall back to preview if needed
+        if hasattr(pc2, 'create_still_configuration'):
+            try:
+                cfg = pc2.create_still_configuration(main={'format': 'RGB888'})
+            except Exception:
+                cfg = pc2.create_preview_configuration({'main': {'format': 'RGB888'}})
+        else:
+            cfg = pc2.create_preview_configuration({'main': {'format': 'RGB888'}})
+        pc2.configure(cfg)
         pc2.start()
         _camera = pc2
-    return _camera
+        return _camera
+    except Exception:
+        return None
+
+
+def _encode_image_to_jpeg_bytes(im):
+    """Encode a numpy array image to JPEG bytes using cv2 or PIL."""
+    try:
+        import cv2
+        ret, buf = cv2.imencode('.jpg', im)
+        if ret:
+            return buf.tobytes()
+    except Exception:
+        pass
+
+    try:
+        from PIL import Image
+        import io
+        img = Image.fromarray(im)
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG')
+        return buf.getvalue()
+    except Exception:
+        return None
 
 
 def capture_jpeg():
+    """Capture a JPEG from Picamera2 or fall back to rpicam-still.
+
+    Returns bytes or None.
+    """
+    # Try Picamera2 first
     cam = _ensure_camera()
-    if cam is None:
-        return None
-    try:
-        im = cam.capture_array()
-        # Encode via OpenCV if installed
+    if cam is not None:
         try:
-            import cv2
-            ret, buf = cv2.imencode('.jpg', im)
-            if ret:
-                return buf.tobytes()
+            im = cam.capture_array()
+            return _encode_image_to_jpeg_bytes(im)
         except Exception:
-            # Fallback: attempt to use PIL
+            # continue to fallback
+            pass
+
+    # Fallback: use Arducam rpicam-still if available
+    if shutil.which('rpicam-still'):
+        tmpfd, tmpname = tempfile.mkstemp(suffix='.jpg')
+        os.close(tmpfd)
+        try:
+            candidates = [
+                f'rpicam-still --camera 0 --output {tmpname}',
+                f'rpicam-still --camera 0 --output {tmpname} --width 1920 --height 1080',
+                f'rpicam-still --camera 0 --output {tmpname} --mode 1920x1080',
+            ]
+            for cmd in candidates:
+                try:
+                    subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True)
+                except subprocess.CalledProcessError:
+                    # ignore and try next candidate
+                    pass
+                if os.path.exists(tmpname):
+                    with open(tmpname, 'rb') as f:
+                        data = f.read()
+                    return data
+            # none produced a file
+        finally:
             try:
-                from PIL import Image
-                import io
-                img = Image.fromarray(im)
-                buf = io.BytesIO()
-                img.save(buf, format='JPEG')
-                return buf.getvalue()
+                os.remove(tmpname)
             except Exception:
-                return None
-    except Exception:
-        return None
+                pass
+
+    return None
