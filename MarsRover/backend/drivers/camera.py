@@ -26,13 +26,14 @@ def _ensure_camera():
     try:
         pc2 = Picamera2()
         # prefer still configuration but fall back to preview if needed
+        target_size = (2328, 1748)
         if hasattr(pc2, 'create_still_configuration'):
             try:
-                cfg = pc2.create_still_configuration(main={'format': 'RGB888'})
+                cfg = pc2.create_still_configuration(main={'format': 'RGB888', 'size': target_size})
             except Exception:
-                cfg = pc2.create_preview_configuration({'main': {'format': 'RGB888'}})
+                cfg = pc2.create_preview_configuration(main={'format': 'RGB888', 'size': target_size})
         else:
-            cfg = pc2.create_preview_configuration({'main': {'format': 'RGB888'}})
+            cfg = pc2.create_preview_configuration(main={'format': 'RGB888', 'size': target_size})
         pc2.configure(cfg)
         pc2.start()
         _camera = pc2
