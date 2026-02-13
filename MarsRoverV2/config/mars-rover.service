@@ -1,0 +1,16 @@
+[Unit]
+Description=Mars Rover Camera Streaming Service
+After=network.target hostapd.service dnsmasq.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/mars_rover_stream
+ExecStart=/home/pi/mars_rover_venv/bin/python3 main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

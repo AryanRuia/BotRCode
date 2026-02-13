@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+mars_rover_venv/
+bin/
+include/
+lib/
+pyvenv.cfg
+
+# Flask
+instance/
+.webassets-cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logging
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Camera/temporary files
+*.jpg
+*.png
+*.tmp
+
+# Configuration with sensitive data
+config/hostapd.conf.local
+config/dnsmasq.conf.local
+.env
+.env.local
