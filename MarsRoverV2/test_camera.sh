@@ -51,24 +51,31 @@ fi
 # Check network configuration
 echo ""
 echo "[5/5] Checking network configuration..."
-if ip addr show wlan0 &>/dev/null; then
-    WLAN0_IP=$(ip addr show wlan0 | grep "inet " | awk '{print $2}')
-    echo "✓ wlan0 found: $WLAN0_IP"
+WLAN_INTERFACE=$(nmcli device | grep wifi | awk '{print $1}' | head -1)
+
+if [ -n "$WLAN_INTERFACE" ]; then
+    WLAN_IP=$(nmcli device show "$WLAN_INTERFACE" | grep "IP4.ADDRESS" | awk '{print $2}' | cut -d'/' -f1)
+    echo "✓ WiFi interface found: $WLAN_INTERFACE"
+    [ -n "$WLAN_IP" ] && echo "  IP Address: $WLAN_IP"
 else
-    echo "⚠ wlan0 not configured"
+    echo "⚠ No WiFi interface detected"
 fi
 
-# Check hostapd and dnsmasq
-if sudo systemctl is-active --quiet hostapd; then
-    echo "✓ hostapd running"
+# Check NetworkManager and hotspot
+echo ""
+echo "Checking NetworkManager status..."
+if nmcli connection show "MarsRover" &>/dev/null; then
+    if nmcli connection show --active | grep -q "MarsRover"; then
+        echo "✓ MarsRover hotspot is ACTIVE"
+        HOTSPOT_IP=$(nmcli -t device show | grep DHCP4.OPTION | grep "routers = " | awk '{print $NF}' || echo "192.168.4.1")
+        echo "  Access at: http://$HOTSPOT_IP:5000"
+    else
+        echo "⚠ MarsRover hotspot configured but not active"
+        echo "  Run: nmcli connection up MarsRover"
+    fi
 else
-    echo "⚠ hostapd not running (run: sudo systemctl start hostapd)"
-fi
-
-if sudo systemctl is-active --quiet dnsmasq; then
-    echo "✓ dnsmasq running"
-else
-    echo "⚠ dnsmasq not running (run: sudo systemctl start dnsmasq)"
+    echo "⚠ MarsRover hotspot not configured"
+    echo "  Run: ./setup.sh to configure"
 fi
 
 echo ""

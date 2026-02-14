@@ -42,32 +42,38 @@ check_venv() {
 }
 
 start_hotspot() {
-    print_status "Starting hotspot services..."
+    print_status "Starting hotspot with NetworkManager..."
     
-    # Check if already running
-    if sudo systemctl is-active --quiet hostapd; then
-        print_warning "hostapd is already running"
-    else
-        sudo systemctl start hostapd
-        print_success "hostapd started"
+    # Get WiFi interface
+    WLAN_INTERFACE=$(nmcli device | grep wifi | awk '{print $1}' | head -1)
+    
+    if [ -z "$WLAN_INTERFACE" ]; then
+        print_error "No WiFi interface found!"
+        return 1
     fi
     
-    if sudo systemctl is-active --quiet dnsmasq; then
-        print_warning "dnsmasq is already running"
+    # Activate the hotspot connection
+    if nmcli connection show "MarsRover" &>/dev/null; then
+        nmcli connection up "MarsRover"
+        print_success "Hotspot activated on $WLAN_INTERFACE"
     else
-        sudo systemctl start dnsmasq
-        print_success "dnsmasq started"
+        print_error "MarsRover connection not found. Run setup.sh first."
+        return 1
     fi
     
     sleep 2
-    print_status "Hotspot should be available now"
+    print_status "Hotspot is now active"
 }
 
 stop_hotspot() {
-    print_status "Stopping hotspot services..."
-    sudo systemctl stop hostapd || true
-    sudo systemctl stop dnsmasq || true
-    print_success "Hotspot services stopped"
+    print_status "Stopping hotspot..."
+    
+    if nmcli connection show "MarsRover" &>/dev/null; then
+        nmcli connection down "MarsRover" || true
+        print_success "Hotspot deactivated"
+    else
+        print_warning "MarsRover connection not found"
+    fi
 }
 
 start_server() {
@@ -106,18 +112,26 @@ show_status() {
     print_status "System Status:"
     echo ""
     
-    echo "Hotspot Services:"
-    sudo systemctl status hostapd --no-pager | head -3
-    echo ""
-    sudo systemctl status dnsmasq --no-pager | head -3
+    echo "NetworkManager Connections:"
+    nmcli connection show --active | grep -E "NAME|wifi" || print_warning "No active connections"
     echo ""
     
-    echo "Network Configuration:"
-    ip addr show wlan0 2>/dev/null | grep "inet " || print_warning "wlan0 not found"
+    echo "Hotspot Status:"
+    if nmcli connection show "MarsRover" &>/dev/null; then
+        if nmcli connection show --active | grep -q "MarsRover"; then
+            echo "✓ MarsRover hotspot is ACTIVE"
+            HOTSPOT_IP=$(nmcli device show | grep "wlan" -A 10 | grep "IP4.ADDRESS" | awk '{print $2}' | cut -d'/' -f1)
+            echo "  IP Address: ${HOTSPOT_IP:-192.168.4.1}"
+        else
+            echo "✗ MarsRover hotspot is INACTIVE"
+        fi
+    else
+        echo "✗ MarsRover connection not configured. Run setup.sh"
+    fi
     echo ""
     
     echo "Connected Clients:"
-    sudo iw dev wlan0 station dump 2>/dev/null | grep -E "Station|signal|tx.*bitrate" || print_warning "No clients connected"
+    nmcli device wifi list 2>/dev/null | head -5 || print_warning "WiFi unavailable"
 }
 
 show_help() {

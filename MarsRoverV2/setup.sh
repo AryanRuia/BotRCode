@@ -24,10 +24,16 @@ echo "[2/6] Installing system dependencies..."
 sudo apt-get install -y \
     python3-pip \
     python3-venv \
-    hostapd \
-    dnsmasq \
-    rfkill \
+    network-manager \
     net-tools
+
+# Remove legacy packages if they exist
+echo "Removing legacy networking packages..."
+sudo apt-get remove -y hostapd dnsmasq 2>/dev/null || true
+
+# Ensure NetworkManager is enabled and running
+sudo systemctl enable network-manager
+sudo systemctl start network-manager
 
 # Install Python packages
 echo "[3/6] Creating Python virtual environment..."
@@ -38,16 +44,13 @@ echo "[4/6] Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Copy configuration files
-echo "[5/6] Setting up configuration files..."
-CONFIG_DIR="/home/$(whoami)/mars_rover_stream/config"
-sudo cp config/hostapd.conf /etc/hostapd/hostapd.conf || true
-sudo cp config/dnsmasq.conf /etc/dnsmasq.conf || true
+# Configure hotspot with NetworkManager
+echo "[5/6] Configuring WiFi hotspot with NetworkManager..."
+./config/network_setup.sh
 
-# Enable services
-echo "[6/6] Enabling services..."
-sudo systemctl enable hostapd 2>/dev/null || true
-sudo systemctl enable dnsmasq 2>/dev/null || true
+# Configuration complete
+echo "[6/6] Setup verification..."
+echo "NetworkManager services configured"
 
 echo ""
 echo "================================"

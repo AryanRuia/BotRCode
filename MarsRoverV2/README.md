@@ -56,9 +56,11 @@ cd ~/mars_rover_stream
 
 The setup script will:
 - Update system packages
-- Install required system dependencies (hostapd, dnsmasq)
+- Remove legacy networking packages (hostapd, dnsmasq)
+- Install NetworkManager for modern hotspot configuration
 - Create a Python virtual environment
 - Install Python packages
+- Configure the WiFi hotspot automatically
 
 ```bash
 chmod +x setup.sh
@@ -66,17 +68,6 @@ chmod +x setup.sh
 ```
 
 **Note**: The setup script requires `sudo` for system commands. You may be prompted for your password.
-
-### 3. Configure Network Interface
-
-After setup, configure the network interface:
-
-```bash
-chmod +x config/network_setup.sh
-sudo config/network_setup.sh
-```
-
-This configures `wlan0` to use the static IP `192.168.4.1`.
 
 ## Configuration
 
@@ -86,14 +77,41 @@ Edit `config/hostapd.conf`:
 
 ```bash
 sudo nano config/hostapd.conf
+
+## Configuration
+
+### WiFi Hotspot Settings
+
+To customize your WiFi hotspot (SSID and password), edit `config/network_setup.sh`:
+
+```bash
+nano config/network_setup.sh
 ```
 
-Key settings to customize:
+Change these lines:
+```bash
+HOTSPOT_SSID="MarsRover"          # Your network name
+HOTSPOT_PASSWORD="password123"    # Your WiFi password
+HOTSPOT_IP="192.168.4.1"          # Access point IP
+```
 
-- **SSID**: Change `ssid=MarsRover` to your desired network name
-- **Password**: Change `wpa_passphrase=password123` to a secure password
-- **Channel**: Default is channel 6 (1-11 available)
-- **Hardware Mode**: `g` (2.4 GHz) or `a` (5 GHz, if supported)
+Then reconfigure NetworkManager:
+
+```bash
+chmod +x config/network_setup.sh
+./config/network_setup.sh
+```
+
+Alternatively, use nmcli directly:
+
+```bash
+# Change password
+nmcli connection modify MarsRover wifi-sec.psk "newpassword"
+
+# Change SSID
+nmcli connection delete MarsRover
+./config/network_setup.sh  # Re-run with edited settings
+```
 
 ### Camera Settings
 
@@ -113,33 +131,41 @@ JPEG_QUALITY = 85                 # 0-100, lower = smaller files, faster streami
 
 ## Running the System
 
-### 1. Activate Virtual Environment
-
-```bash
-source ~/mars_rover_venv/bin/activate
-```
-
-### 2. Start Hotspot Services
-
-Before running the application, start the hostapd and dnsmasq services:
-
-```bash
-sudo systemctl start hostapd
-sudo systemctl start dnsmasq
-```
-
-Verify they're running:
-
-```bash
-sudo systemctl status hostapd
-sudo systemctl status dnsmasq
-```
-
-### 3. Start the Streaming Server
+### Quick Start (All-in-One)
 
 ```bash
 cd ~/mars_rover_stream
+./start.sh start
+```
+
+This will activate the hotspot and start the streaming server.
+
+### Alternative: Manual Start
+
+```bash
+# Activate virtual environment
+source ~/mars_rover_venv/bin/activate
+
+# Start hotspot
+./start.sh hotspot
+
+# In another terminal, start streaming server
+cd ~/mars_rover_stream
 python3 main.py
+```
+
+### Start the Streaming Server
+
+```bash
+cd ~/mars_rover_stream
+./start.sh server
+```
+
+Or with virtual environment:
+
+```bash
+source ~/mars_rover_venv/bin/activate
+python3 mars_rover_stream/main.py
 ```
 
 You should see output like:
@@ -155,7 +181,7 @@ INFO:__main__:Starting web server on 0.0.0.0:5000
 INFO:__main__:/stream requested
 ```
 
-### 4. Connect and View Stream
+### Connect and View Stream
 
 From any device (phone, tablet, computer):
 
@@ -185,12 +211,33 @@ libcamera-hello --list-cameras
 ### Hotspot Not Appearing
 
 ```bash
-# Check hostapd status
-sudo systemctl status hostapd
+# Check if hotspot connection exists
+nmcli connection show
 
-# Check for conflicts
-sudo rfkill list
-sudo rfkill unblock wlan
+# If MarsRover exists but is not active
+nmcli connection up MarsRover
+
+# If MarsRover doesn't exist, reconfigure
+./config/network_setup.sh
+
+# Check hotspot details
+nmcli device show wlan0
+```
+
+### NetworkManager Connection Issues
+
+```bash
+# List all connections
+nmcli connection show
+
+# Restart NetworkManager
+sudo systemctl restart network-manager
+
+# Check NetworkManager status
+sudo systemctl status network-manager
+
+# View detailed connection info
+nmcli connection show MarsRover
 ```
 
 ### Stream Lag or Frame Drops
@@ -198,7 +245,7 @@ sudo rfkill unblock wlan
 - Reduce resolution in `main.py`
 - Lower JPEG quality
 - Reduce frame rate
-- Check WiFi channel for interference: `sudo iw wlan0 info`
+- Check WiFi channel for interference: `nmcli device wifi show`
 
 ### High CPU Usage
 
@@ -213,8 +260,8 @@ sudo rfkill unblock wlan
 - Check firewall: `sudo ufw status`
 - Restart services:
   ```bash
-  sudo systemctl restart hostapd dnsmasq
-  sudo pkill python3
+  ./start.sh stop
+  ./start.sh start
   ```
 
 ## Performance Metrics
@@ -230,57 +277,40 @@ On Raspberry Pi 5 with default settings (1280x720 @ 30 FPS, 85% JPEG quality):
 ## Stopping the System
 
 ```bash
-# Stop the server
-Ctrl+C  # In the terminal running main.py
+# Stop everything at once
+./start.sh stop
 
-# Stop hotspot services
-sudo systemctl stop hostapd
-sudo systemctl stop dnsmasq
+# Or manually
+./start.sh stop hotspot  # Stop hotspot
+Ctrl+C                   # Stop server in terminal
 ```
 
 ## Automatic Startup (Optional)
 
-To automatically start the streaming system on boot:
+To automatically start the streaming system on boot, use the included service file:
 
-1. Create a systemd service file:
+1. Copy the service file:
 
 ```bash
-sudo nano /etc/systemd/system/mars-rover.service
+sudo cp config/mars-rover.service /etc/systemd/system/
 ```
 
-2. Add the following:
-
-```ini
-[Unit]
-Description=Mars Rover Streaming Service
-After=network.target hostapd.service dnsmasq.service
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/mars_rover_stream
-ExecStart=/home/pi/mars_rover_venv/bin/python3 main.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-3. Enable and start:
+2. Enable and test:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable mars-rover.service
-sudo systemctl start mars-rover.service
+sudo systemctl restart mars-rover.service
 ```
 
-4. Check status:
+3. Check status:
 
 ```bash
 sudo systemctl status mars-rover.service
 sudo journalctl -u mars-rover.service -f
 ```
+
+**Note**: The service requires both the hotspot and Python application to be running on boot. It will automatically start after network connectivity is established.
 
 ## API Endpoints
 
@@ -301,30 +331,41 @@ sudo journalctl -u mars-rover.service -f
 ```
 mars_rover_stream/
 ├── setup.sh                 # Main setup script
+├── start.sh                 # Quick start/stop script
+├── test_camera.sh           # Hardware test script
 ├── requirements.txt         # Python dependencies
 ├── mars_rover_stream/
 │   └── main.py             # Main application
 ├── templates/
 │   └── index.html          # Web interface
 └── config/
-    ├── hostapd.conf        # WiFi hotspot config
-    ├── dnsmasq.conf        # DHCP/DNS config
-    └── network_setup.sh    # Network configuration script
+    ├── network_setup.sh    # NetworkManager hotspot setup
+    ├── mars-rover.service  # Systemd service file (auto-start)
+    ├── hostapd.conf        # (Legacy - kept for reference)
+    └── dnsmasq.conf        # (Legacy - kept for reference)
 ```
 
 ## Dependencies
 
 ### System Packages
-- `hostapd` - WiFi hotspot access point
-- `dnsmasq` - DHCP and DNS server
-- `rfkill` - WiFi management utility
+- `network-manager` - WiFi hotspot configuration via nmcli
+- `python3-pip` & `python3-venv` - Python environment management
+- `net-tools` - Network utilities
 
 ### Python Packages
 - `flask==3.0.0` - Lightweight web framework
 - `picamera2==0.3.17` - Raspberry Pi camera library
-- `Pillow==10.1.0` - Image processing
+- `Pillow==11.0.0` - Image processing
 
 All dependencies are installed by the setup script.
+
+## Technology Stack
+
+- **Hotspot**: NetworkManager (nmcli)
+- **Web Server**: Flask
+- **Streaming Protocol**: MJPEG over HTTP
+- **Camera Interface**: picamera2 (libcamera)
+- **Image Processing**: Pillow
 
 ## License
 
@@ -336,11 +377,13 @@ This project is provided as-is for Mars Rover applications.
 - Hotspot range is typically 20-30 meters indoors
 - Multiple connections may reduce performance - optimize resolution/FPS as needed
 - Always use secure passwords for production systems
+- NetworkManager replaced legacy hostapd/dnsmasq for better compatibility with Raspberry Pi OS Trixie
 - Consider adding HTTPS for remote access (requires reverse proxy like nginx)
 
 ---
 
 For updates or troubleshooting, check the system logs:
+
 ```bash
 journalctl -u mars-rover.service -f
 ```

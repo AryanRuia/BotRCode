@@ -9,56 +9,53 @@ Copy all files to your Raspberry Pi and run the setup script:
 ```bash
 # On your Raspberry Pi
 cd ~/mars_rover_stream
-chmod +x setup.sh
+chmod +x setup.sh config/*.sh
 ./setup.sh
 ```
 
 This will:
 - Update system packages
-- Install required dependencies (hostapd, dnsmasq, Flask, picamera2)
+- Remove legacy packages (hostapd, dnsmasq)
+- Install NetworkManager
 - Create a Python virtual environment
-- Configure basic hostapd/dnsmasq files
+- Install Python dependencies
+- Configure the WiFi hotspot automatically with NetworkManager
 
-### Step 2: Configure Network
-
-```bash
-chmod +x config/network_setup.sh
-sudo config/network_setup.sh
-```
-
-This configures your WiFi interface for hotspot mode.
-
-### Step 3: Test Camera (Optional)
+### Step 2: Test Camera (Optional)
 
 ```bash
-chmod +x test_camera.sh
 ./test_camera.sh
 ```
 
 This verifies your camera is properly connected and detected.
 
-### Step 4: Customize WiFi Hotspot (Optional)
+### Step 3: Customize WiFi Hotspot (Optional)
 
 Edit the WiFi settings:
 
 ```bash
-sudo nano config/hostapd.conf
+nano config/network_setup.sh
 ```
 
 Change these lines:
-```
-ssid=MarsRover              # Your network name
-wpa_passphrase=password123  # Your WiFi password
+```bash
+HOTSPOT_SSID="MarsRover"          # Your network name
+HOTSPOT_PASSWORD="password123"    # Your WiFi password
+HOTSPOT_IP="192.168.4.1"          # Access point IP
 ```
 
-### Step 5: Start the System
+Then reconfigure:
+```bash
+./config/network_setup.sh
+```
+
+### Step 4: Start the System
 
 ```bash
-chmod +x start.sh
 ./start.sh start
 ```
 
-### Step 6: Access the Stream
+### Step 5: Access the Stream
 
 1. From your phone/laptop, connect to the WiFi network (default: `MarsRover`)
 2. Open your browser to: **http://192.168.4.1:5000**
@@ -91,6 +88,21 @@ chmod +x start.sh
 ### Start Just the Hotspot
 ```bash
 ./start.sh hotspot
+```
+
+### Manage Hotspot with nmcli
+```bash
+# List connections
+nmcli connection show
+
+# Activate hotspot
+nmcli connection up MarsRover
+
+# Deactivate hotspot
+nmcli connection down MarsRover
+
+# Change password temporarily
+nmcli connection modify MarsRover wifi-sec.psk "newpassword"
 ```
 
 ---
@@ -128,11 +140,21 @@ Should output `supported=1 detected=1`
 
 ### WiFi hotspot not showing up
 ```bash
-sudo systemctl restart hostapd
+# Check if connection exists
+nmcli connection show MarsRover
+
+# Activate it
+nmcli connection up MarsRover
+
+# Reconfigure if needed
+./config/network_setup.sh
+
+# Check NetworkManager status
+systemctl status network-manager
 ```
 
 ### Stream is very laggy
-- Lower the resolution
+- Lower the resolution in `mars_rover_stream/main.py`
 - Reduce JPEG quality
 - Lower the frame rate
 
@@ -156,14 +178,28 @@ libcamera-hello --list-cameras
 htop
 ```
 
-### Check hotspot clients
+### Check hotspot status with NetworkManager
 ```bash
-sudo iw dev wlan0 station dump
+# List all connections
+nmcli connection show
+
+# Show active connections
+nmcli connection show --active
+
+# View specific connection details
+nmcli connection show MarsRover
+
+# Check WiFi interface
+nmcli device show wlan0
 ```
 
-### View streaming server logs
+### Monitor streaming server logs
 ```bash
+# If using auto-start service
 sudo journalctl -u mars-rover.service -f
+
+# If running manually
+tail -f mars_rover_stream/main.py  # (doesn't have logs, monitor at runtime)
 ```
 
 ---
