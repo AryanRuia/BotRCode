@@ -11,7 +11,7 @@ echo ""
 # Check if running on Raspberry Pi
 echo "[1/5] Checking hardware..."
 if grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
-    MODEL=$(cat /proc/device-tree/model)
+    MODEL=$(cat /proc/device-tree/model | tr -d '\0')
     echo "✓ Hardware: $MODEL"
 else
     echo "✗ Not running on Raspberry Pi"
