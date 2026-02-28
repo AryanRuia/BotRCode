@@ -28,7 +28,7 @@ pip install flask==3.0.0 Pillow==11.0.0 picamera2
 # Configure hotspot
 echo "[5/6] Configuring WiFi hotspot..."
 # Note: Fixed path to network_setup.sh (it's in your current folder)
-chmod +x network_setup.sh
-./network_setup.sh
+chmod +x config/network_setup.sh
+./config/network_setup.sh
 
 echo "[6/6] Setup Complete!"
