@@ -21,11 +21,14 @@ fi
 # Check camera detection
 echo ""
 echo "[2/5] Checking camera detection..."
-if command -v libcamera-hello &> /dev/null; then
+if command -v rpicam-hello &> /dev/null; then
+    rpicam-hello --list-cameras
+    echo "✓ rpicam tools available"
+elif command -v libcamera-hello &> /dev/null; then
     libcamera-hello --list-cameras
     echo "✓ libcamera tools available"
 else
-    echo "✗ libcamera tools not found"
+    echo "✗ Camera tools (rpicam/libcamera) not found"
 fi
 
 # Check Python environment
