@@ -1,37 +1,16 @@
 #!/bin/bash
-
-# NetworkManager WiFi Hotspot Configuration for Raspberry Pi (Bookworm/Pi 5 Optimized)
-# Configures an OPEN WiFi access point (no password) using nmcli (NetworkManager)
-
 set -e
 
-echo "Configuring OPEN WiFi hotspot with NetworkManager..."
-echo ""
+echo "Configuring TRUE OPEN WiFi hotspot..."
 
-# Get interface name (usually wlan0)
 WLAN_INTERFACE=$(nmcli device | grep wifi | awk '{print $1}' | head -1)
-
-if [ -z "$WLAN_INTERFACE" ]; then
-    echo "Error: No WiFi interface found!"
-    echo "Available devices:"
-    nmcli device
-    exit 1
-fi
-
-echo "Using interface: $WLAN_INTERFACE"
-
-# Network configuration variables
 HOTSPOT_SSID="MarsRover"
 HOTSPOT_IP="192.168.4.1"
 
-# Create hotspot connection with NetworkManager
-echo "Creating hotspot connection..."
-
-# Delete existing hotspot connection if it exists
+# 1. Delete old connection
 nmcli connection delete "$HOTSPOT_SSID" 2>/dev/null || true
 
-# Create new OPEN hotspot connection
-# Security is set to 'none' to remove password requirements for better Mac compatibility
+# 2. Add the connection without security parameters
 nmcli connection add \
     type wifi \
     ifname "$WLAN_INTERFACE" \
@@ -39,14 +18,16 @@ nmcli connection add \
     autoconnect yes \
     ssid "$HOTSPOT_SSID" \
     802-11-wireless.mode ap \
-    wifi-sec.key-mgmt none \
     ipv4.method shared \
     ipv4.addresses "$HOTSPOT_IP/24"
 
-# Force the WiFi band to 2.4GHz for maximum device compatibility
+# 3. CRITICAL: Explicitly remove the security section to prevent WEP fallback
+nmcli connection modify "$HOTSPOT_SSID" remove 802-11-wireless-security
+
+# 4. Force 2.4GHz for compatibility
 nmcli connection modify "$HOTSPOT_SSID" 802-11-wireless.band bg
 
-# Activate the connection
+# 5. Activate
 echo "Activating hotspot..."
 nmcli connection up "$HOTSPOT_SSID"
 
