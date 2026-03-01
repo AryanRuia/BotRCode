@@ -42,7 +42,7 @@ def initialize_camera():
         
         # Configure camera with optimized settings
         config = camera.create_video_configuration(
-            main={"size": CAMERA_RESOLUTION, "format": "RGB888"},
+            main={"size": CAMERA_RESOLUTION, "format": "BGR888"},
             controls={"FrameRate": CAMERA_FPS}
         )
         
