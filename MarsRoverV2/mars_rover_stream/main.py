@@ -8,6 +8,10 @@ Minimal dependencies for RPi 5
 import io
 import time
 import threading
+import board
+import busio
+from adafruit_bmp3xx import BMP3XX_I2C
+from adafruit_lsm6ds.lsm6dsox import LSM6DSOX
 from flask import Flask, render_template, Response
 from picamera2 import Picamera2, Preview
 from picamera2.encoders import MJPEGEncoder
@@ -128,13 +132,24 @@ def stream():
         mimetype='multipart/x-mixed-replace; boundary=--MJPEGBOUNDARY'
     )
 
+i2c = board.I2C()
+bmp = BMP3XX_I2C(i2c)
+lsm = LSM6DSOX(i2c)
 
 @app.route('/status')
 def status():
+    accel_x, accel_y, accel_z = lsm.acceleration
+    gyro_x, gyro_y, gyro_z = lsm.gyro
     """Return system status"""
     return {
         'status': 'running',
         'camera': 'initialized' if camera is not None else 'not initialized',
+        'telemetry': {
+            'pressure': round(bmp.pressure, 2),
+            'temp': round(bmp.temperature, 2),
+            'accel': [round(accel_x, 2), round(accel_y, 2), round(accel_z, 2)],
+            'gyro': [round(gyro_x, 2), round(gyro_y, 2), round(gyro_z, 2)]
+        },
         'resolution': CAMERA_RESOLUTION,
         'fps': CAMERA_FPS
     }

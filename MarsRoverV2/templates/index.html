@@ -261,6 +261,14 @@
                         <div class="status-item-label">FPS</div>
                         <div class="status-item-value" id="fps-value">-</div>
                     </div>
+                    <div class="status-item">
+                        <div class="status-item-label">Environment</div>
+                        <div class="status-item-value" id="env-value">--°C | -- hPa</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-item-label">IMU (Accel G)</div>
+                        <div class="status-item-value" id="imu-value">X: 0 Y: 0 Z: 0</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -272,6 +280,7 @@
             try {
                 const response = await fetch('/status');
                 const data = await response.json();
+                const tel = data.telemetry;
 
                 document.getElementById('status-value').textContent = 
                     data.status.charAt(0).toUpperCase() + data.status.slice(1);
@@ -284,6 +293,13 @@
                 
                 document.getElementById('fps-value').textContent = 
                     `${data.fps} FPS`;
+                
+                document.getElementById('env-value').textContent =
+                    `${tel.temp}°C | ${tel.pressure} hPa`;
+                
+                document.getElementById('imu-value').textContent =
+                    `X:${tel.accel[0]} Y:${tel.accel[1]} Z:${tel.accel[2]}`;
+                    
             } catch (error) {
                 console.error('Failed to fetch status:', error);
             }
