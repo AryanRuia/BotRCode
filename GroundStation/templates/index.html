@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mars Rover Mission Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .content {
+            padding: 25px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 2px solid #333;
+        }
+
+        .video-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #222;
+        }
+
+        .status-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+        }
+
+        .status-item {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #1e3a8a;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .status-item-label {
+            font-size: 0.85em;
+            color: #6b7280;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .status-item-value {
+            font-size: 1.2em;
+            color: #1e3a8a;
+            font-weight: 700;
+        }
+
+        .indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .active { background: #10b981; animation: pulse 2s infinite; }
+        .warning { background: #ef4444; }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Ground Station Control</h1>
+        </div>
+
+        <div class="content">
+            <div class="info-bar">
+                <div>LINK: <span id="link-type">Xbee + WiFi</span></div>
+                <div id="connection-status">Rover Connected</div>
+            </div>
+
+            <div class="video-container">
+                <img id="stream-img" src="http://192.168.4.1:5000/stream" alt="Waiting for WiFi Stream...">
+            </div>
+
+            <div class="status-section">
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-item-label"><span class="indicator active"></span>Radio Link</div>
+                        <div class="status-item-value" id="status-value">Searching...</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-item-label">Environment</div>
+                        <div class="status-item-value" id="env-value">--°C | -- hPa</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-item-label">IMU Accelerometer</div>
+                        <div class="status-item-value" id="imu-value">X: 0 Y: 0 Z: 0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-item-label">Stream Config</div>
+                        <div class="status-item-value" id="resolution-value">1280x720 @ 30fps</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fetch telemetry from the local Ground Station dashboard.py
+        async function updateStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                const tel = data.telemetry;
+
+                document.getElementById('status-value').textContent = data.status;
+                
+                // Update environment data
+                document.getElementById('env-value').textContent = 
+                    `${tel.temp.toFixed(1)}°C | ${tel.pressure.toFixed(1)} hPa`;
+                
+                // Update IMU data
+                document.getElementById('imu-value').textContent = 
+                    `X:${tel.accel[0]} Y:${tel.accel[1]} Z:${tel.accel[2]}`;
+                    
+            } catch (error) {
+                console.error('XBee Data Link Offline:', error);
+                document.getElementById('status-value').textContent = "Link Lost";
+            }
+        }
+
+        // Handle WiFi video stream errors
+        document.getElementById('stream-img').addEventListener('error', () => {
+            console.warn('WiFi stream disconnected. Dashboard remains active via XBee.');
+            document.getElementById('connection-status').textContent = "Video Offline (Out of Range)";
+            document.getElementById('connection-status').style.color = "#ef4444";
+        });
+
+        // Fast update interval for real-time radio telemetry
+        window.addEventListener('load', () => {
+            updateStatus();
+            setInterval(updateStatus, 500); // 0.5 second updates
+        });
+    </script>
+</body>
+</html>
