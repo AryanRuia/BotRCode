@@ -14,7 +14,7 @@ sudo apt update && sudo apt upgrade -y
 # i2c-tools: To verify XBee/Sensors
 # python3-pip: Package manager
 echo "Installing system dependencies..."
-sudo apt install -y python3-venv python3-pip i2c-tools nmcli
+sudo apt install -y python3-venv python3-pip i2c-tools network-manager
 
 # 3. Enable UART (Required for XBee)
 # This ensures the serial port /dev/ttyAMA0 is available
