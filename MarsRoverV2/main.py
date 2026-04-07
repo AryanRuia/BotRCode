@@ -29,8 +29,8 @@ lsm = LSM6DSOX(i2c)
 # --- MOTOR SETUP ---
 # IMPORTANT: Replace these GPIO pin numbers with your actual wiring!
 # format: Motor(forward=DIR1, backward=DIR2, enable=PWM_PIN)
-left_motor = Motor(forward=20, backward=21, enable=12) 
-right_motor = Motor(forward=19, backward=26, enable=13)
+left_motor = Motor(forward=19, backward=16, enable=12)
+right_motor = Motor(forward=26, backward=20, enable=13)
 
 def initialize_camera():
     global camera
