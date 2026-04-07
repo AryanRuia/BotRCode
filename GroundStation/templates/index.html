@@ -121,6 +121,53 @@
             font-size: 0.9em;
             font-weight: 600;
         }
+        
+        .control-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .control-inputs {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        
+        .control-group {
+            flex: 1;
+        }
+        
+        .control-group label {
+            display: block;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .control-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        .execute-btn {
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            height: 39px;
+            transition: background 0.3s;
+        }
+        
+        .execute-btn:hover {
+            background: #312e81;
+        }
     </style>
 </head>
 <body>
@@ -159,6 +206,21 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="control-section">
+                <h3 style="margin-bottom: 15px; color: #1e3a8a;">Navigation Vector</h3>
+                <div class="control-inputs">
+                    <div class="control-group">
+                        <label>Angle (Degrees)</label>
+                        <input type="number" id="input-angle" placeholder="e.g. 90 for Right">
+                    </div>
+                    <div class="control-group">
+                        <label>Magnitude (Distance)</label>
+                        <input type="number" id="input-mag" placeholder="e.g. 5">
+                    </div>
+                    <button class="execute-btn" onclick="sendVector()">Execute</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -192,6 +254,35 @@
             document.getElementById('connection-status').textContent = "Video Offline (Out of Range)";
             document.getElementById('connection-status').style.color = "#ef4444";
         });
+        
+        // Handle sending vectors to the rover
+        async function sendVector() {
+            const angle = parseFloat(document.getElementById('input-angle').value) || 0;
+            const mag = parseFloat(document.getElementById('input-mag').value) || 0;
+
+            try {
+                const response = await fetch('/move', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ angle: angle, magnitude: mag })
+                });
+                
+                if(response.ok) {
+                    // Provide UI feedback
+                    const btn = document.querySelector('.execute-btn');
+                    btn.style.background = '#10b981';
+                    btn.textContent = 'Sent!';
+                    setTimeout(() => {
+                        btn.style.background = '#1e3a8a';
+                        btn.textContent = 'Execute';
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Error sending command:', error);
+            }
+        }
 
         // Fast update interval for real-time radio telemetry
         window.addEventListener('load', () => {

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import serial
 import threading
 
@@ -39,6 +39,19 @@ def status():
         "resolution": [1280, 720],
         "fps": 30
     })
+
+@app.route('/move', methods=['POST'])
+def move():
+    """Receives polar vector from UI and sends over XBee"""
+    data = request.json
+    angle = data.get('angle', 0)
+    magnitude = data.get('magnitude', 0)
+    
+    # Format: CMD:VEC|A:angle|M:magnitude
+    command = f"CMD:VEC|A:{angle}|M:{magnitude}\n"
+    ser.write(command.encode('utf-8'))
+    
+    return jsonify({"status": "Command Sent", "vector": [angle, magnitude]})
 
 if __name__ == '__main__':
     threading.Thread(target=listen_xbee, daemon=True).start()
